@@ -4,7 +4,7 @@ import streamlit as st
 st.set_page_config(page_title="Análisis de Terremotos Globales 2023", layout="wide")
 
 import pandas as pd
-import folium
+import folium as folium
 from streamlit_folium import folium_static
 import networkx as nx
 from scipy.spatial import distance_matrix
