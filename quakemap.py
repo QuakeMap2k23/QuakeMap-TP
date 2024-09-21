@@ -1,14 +1,23 @@
 import streamlit as st
-
-# Configuración de la página (debe ser la primera llamada a Streamlit)
-st.set_page_config(page_title="Análisis de Terremotos Globales 2023", layout="wide")
-
 import pandas as pd
 import folium
 from streamlit_folium import folium_static
 import networkx as nx
 from scipy.spatial import distance_matrix
 import matplotlib.pyplot as plt
+
+# Configuración de la página
+st.set_page_config(page_title="Análisis de Terremotos Globales 2023", layout="wide", page_icon=":earth_americas:")
+
+# Aplicar un tema oscuro a toda la aplicación
+st.markdown("""
+    <style>
+    .reportview-container {
+        background: black;
+        color: white;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 # Intenta importar plotly, si no está disponible, usará matplotlib
 try:
@@ -43,7 +52,7 @@ def create_map(df):
         folium.CircleMarker(
             location=[row['latitude'], row['longitude']],
             radius=row['mag'] * 1.5,
-            popup=folium.Popup(popup_content, max_width=300),  # Puedes ajustar el max_width aquí
+            popup=folium.Popup(popup_content, max_width=300),
             color="red",
             fill=True,
             fill_color="red",
@@ -51,7 +60,6 @@ def create_map(df):
         ).add_to(m)
     
     return m
-
 
 # Función para crear el grafo
 @st.cache_resource
@@ -76,14 +84,40 @@ def create_graph(df):
 def create_interactive_graph(G, title):
     if USE_PLOTLY:
         pos = nx.get_node_attributes(G, 'pos')
-        edge_x, edge_y = [], []
+        edge_traces = []
+        annotation_traces = []
+        
         for edge in G.edges():
             x0, y0 = pos[edge[0]]
             x1, y1 = pos[edge[1]]
-            edge_x.extend([x0, x1, None])
-            edge_y.extend([y0, y1, None])
-
-        edge_trace = go.Scatter(x=edge_x, y=edge_y, line=dict(width=0.5, color='#888'), hoverinfo='none', mode='lines')
+            distance = G[edge[0]][edge[1]]['weight']
+            
+            edge_trace = go.Scatter(
+                x=[x0, x1, None],
+                y=[y0, y1, None],
+                line=dict(width=1, color='#888'),
+                hoverinfo='none',
+                mode='lines',
+                showlegend=False
+            )
+            
+            # Texto de la distancia en el medio de la arista
+            mid_x = (x0 + x1) / 2
+            mid_y = (y0 + y1) / 2
+            
+            annotation_trace = go.Scatter(
+                x=[mid_x],
+                y=[mid_y],
+                text=[f'{int(distance)} km'],
+                mode='text',
+                textposition='middle center',
+                textfont=dict(size=8, color='white'),
+                hoverinfo='none',
+                showlegend=False
+            )
+            
+            edge_traces.append(edge_trace)
+            annotation_traces.append(annotation_trace)
 
         node_x = [pos[node][0] for node in G.nodes()]
         node_y = [pos[node][1] for node in G.nodes()]
@@ -95,7 +129,7 @@ def create_interactive_graph(G, title):
             marker=dict(
                 showscale=True,
                 colorscale='YlOrRd',
-                size=10,
+                size=8,
                 colorbar=dict(thickness=15, title='Magnitud', xanchor='left', titleside='right')
             )
         )
@@ -103,31 +137,44 @@ def create_interactive_graph(G, title):
         node_magnitudes = [G.nodes[node]['mag'] for node in G.nodes()]
         node_depths = [G.nodes[node]['depth'] for node in G.nodes()]
         node_places = [G.nodes[node]['place'] for node in G.nodes()]
-        node_texts = [f"Mag: {mag}<br>Prof: {depth} km<br>Lugar: {place}" for mag, depth, place in zip(node_magnitudes, node_depths, node_places)]
+        node_texts = [f"Mag: {mag}<br>Prof: {depth} km<br>Place: {place}" for mag, depth, place in zip(node_magnitudes, node_depths, node_places)]
 
         node_trace.marker.color = node_magnitudes
         node_trace.text = node_texts
 
-        fig = go.Figure(data=[edge_trace, node_trace],
-                        layout=go.Layout(
-                            title=title,
-                            showlegend=False,
-                            hovermode='closest',
-                            margin=dict(b=20,l=5,r=5,t=40),
-                            xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-                            yaxis=dict(showgrid=False, zeroline=False, showticklabels=False)
-                        ))
+        layout = go.Layout(
+            title=title,
+            showlegend=False,
+            hovermode='closest',
+            margin=dict(b=20,l=5,r=5,t=40),
+            xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+            yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+            height=800,
+            width=1000,
+            plot_bgcolor='black',
+            paper_bgcolor='black',
+            font=dict(color='white')
+        )
+
+        fig = go.Figure(data=edge_traces + annotation_traces + [node_trace], layout=layout)
         return fig
     else:
-        fig, ax = plt.subplots(figsize=(10, 6))
+        fig, ax = plt.subplots(figsize=(15, 12), facecolor='black')
+        ax.set_facecolor('black')
         pos = nx.get_node_attributes(G, 'pos')
-        nx.draw(G, pos, ax=ax, node_size=20, node_color='red', with_labels=False)
-        ax.set_title(title)
+        nx.draw(G, pos, ax=ax, node_size=20, node_color='red', with_labels=False, edge_color='lightgray', width=0.5)
+        
+        # Dibujar etiquetas de aristas con distancias
+        edge_labels = nx.get_edge_attributes(G, 'weight')
+        edge_labels = {edge: f'{int(weight)} km' for edge, weight in edge_labels.items()}
+        nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=6, font_color='white')
+        
+        ax.set_title(title, fontsize=16, color='white')
+        plt.tight_layout()
         return fig
 
 # Función principal
 def main():
-    
     st.title("Análisis de Terremotos Globales 2023")
 
     data = load_data()
@@ -142,12 +189,12 @@ def main():
     # Creación del grafo
     G = create_graph(data)
     
-    st.subheader("Grafo Completo de Distancias")
-    fig_complete = create_interactive_graph(G, "Grafo Completo")
+    st.subheader("Grafo de Distancias entre Terremotos")
+    fig_complete = create_interactive_graph(G, "Grafo de Distancias")
     if USE_PLOTLY:
         st.plotly_chart(fig_complete, use_container_width=True)
     else:
         st.pyplot(fig_complete)
-   
+
 if __name__ == "__main__":
     main()
