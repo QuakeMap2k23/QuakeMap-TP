@@ -6,10 +6,10 @@ import networkx as nx
 from scipy.spatial import distance_matrix
 import matplotlib.pyplot as plt
 
-# Configuración de la página
+#Configuracion de la pagina
 st.set_page_config(page_title="Análisis de Terremotos Globales 2023", layout="wide", page_icon=":earth_americas:")
 
-# Aplicar un tema oscuro a toda la aplicación
+#Se aplica un tema oscuro para la aplicacion
 st.markdown("""
     <style>
     .reportview-container {
@@ -19,7 +19,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# Intenta importar plotly, si no está disponible, usará matplotlib
+#Se importar plotly, en el caso no se pueda usara matplotlib
 try:
     import plotly.express as px
     import plotly.graph_objects as go
@@ -28,7 +28,7 @@ except ImportError:
     USE_PLOTLY = False
     st.warning("Plotly no está instalado. Se usará matplotlib para las visualizaciones. Para mejores gráficos, instala plotly con: pip install plotly")
 
-# Carga de datos
+#Se cargan los datos
 @st.cache_data
 def load_data():
     data = pd.read_csv("earthquakes_2023_global.csv")
@@ -36,7 +36,7 @@ def load_data():
     data['time'] = pd.to_datetime(data['time'])
     return data
 
-# Función para crear el mapa
+#Funcion donde se crea el mapa
 def create_map(df):
     m = folium.Map(location=[df['latitude'].mean(), df['longitude'].mean()], zoom_start=2)
     
@@ -61,7 +61,7 @@ def create_map(df):
     
     return m
 
-# Función para crear el grafo
+#Funcion donde se crea el grafo
 @st.cache_resource
 def create_graph(df):
     coords = df[['latitude', 'longitude']].to_numpy()
@@ -72,7 +72,7 @@ def create_graph(df):
     for i, row in df.iterrows():
         G.add_node(i, pos=(row['longitude'], row['latitude']), mag=row['mag'], depth=row['depth'], place=row['place'])
     
-    # Conectar solo los 5 terremotos más cercanos para cada terremoto
+    #Se conectan solamente los 5 terremotos mas cercanos para cada terremoto
     for i in range(len(dist_matrix)):
         nearest = dist_matrix[i].argsort()[1:6]
         for j in nearest:
@@ -80,7 +80,7 @@ def create_graph(df):
     
     return G
 
-# Función para crear la visualización interactiva del grafo
+#Funcion donde se crea la visualizacion interactiva del grafo
 def create_interactive_graph(G, title):
     if USE_PLOTLY:
         pos = nx.get_node_attributes(G, 'pos')
@@ -101,7 +101,7 @@ def create_interactive_graph(G, title):
                 showlegend=False
             )
             
-            # Texto de la distancia en el medio de la arista
+            #Texto de la distancia en el medio de la arista
             mid_x = (x0 + x1) / 2
             mid_y = (y0 + y1) / 2
             
@@ -164,7 +164,7 @@ def create_interactive_graph(G, title):
         pos = nx.get_node_attributes(G, 'pos')
         nx.draw(G, pos, ax=ax, node_size=20, node_color='red', with_labels=False, edge_color='lightgray', width=0.5)
         
-        # Dibujar etiquetas de aristas con distancias
+        #Se dibuja etiquetas de aristas con distancias
         edge_labels = nx.get_edge_attributes(G, 'weight')
         edge_labels = {edge: f'{int(weight)} km' for edge, weight in edge_labels.items()}
         nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=6, font_color='white')
@@ -173,7 +173,7 @@ def create_interactive_graph(G, title):
         plt.tight_layout()
         return fig
 
-# Función principal
+#Funcion principal
 def main():
     st.title("Análisis de Terremotos Globales 2023")
 
@@ -181,12 +181,12 @@ def main():
 
     st.write(f"El dataset contiene {len(data)} registros de terremotos en el año 2023.")
 
-    # Mapa interactivo
+    #Mapa interactivo
     st.subheader("Visualización de Epicentros de Terremotos")
     earthquake_map = create_map(data)
     folium_static(earthquake_map)
 
-    # Creación del grafo
+    #Creacion del grafo
     G = create_graph(data)
     
     st.subheader("Grafo de Distancias entre Terremotos")
